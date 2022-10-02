@@ -1,7 +1,7 @@
 # piwooda
 2022 piwood project - ainomis team
 
-jsmodel : tensorflow python to js
+jsmodel : tensorflow python to js \n
 sample : for video testing picturs
 foodsafety6.csv : label, imagefilename data
 piwoodamodel.ipynb : model code
