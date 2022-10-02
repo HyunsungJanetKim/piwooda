@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="Mon, 06 Jan 1990 00:00:01 GMT" />
+  <meta http-equiv="Expires" content="-1" />
+  <meta http-equiv="Cache-Control" content="no-cache" />
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous" />
+  <style>
+    .card-inference {
+      box-shadow: 0 0 2rem 0 rgb(136 152 170 / 56%);
+      max-width: 500px;
+      min-width: 300px;
+    }
+
+    .bg-gradient-blue {
+      background: linear-gradient(87deg, #f2d116 0, #dfdf4b 100%) !important;
+    }
+
+    .result {
+      position: relative;
+      background-color: #f0f0f0;
+      height: 33px;
+      margin-top: 2%;
+      margin-bottom: 2%;
+    }
+
+    .result .result-bar {
+      background-color: #37c62d;
+    }
+
+    .image-canvas,
+    .file-input-label-container,
+    .loading-comp {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #dee2e6;
+    }
+
+    .file-input-label-container {
+      z-index: 1;
+    }
+
+    .loading-comp {
+      display: flex;
+      z-index: 2;
+    }
+
+    .loading-comp[data-loaded='true'] {
+      display: none;
+    }
+
+    .image-uploaded {
+      opacity: 0;
+    }
+
+    .image-uploaded:hover {
+      opacity: 0.6;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      padding-bottom: 100%;
+    }
+
+    .contents {
+      padding: 2.5%;
+    }
+
+    input[type='file'] {
+      display: none;
+    }
+
+    .ai-span {
+      font-size: calc(1.6rem + 0.6vw);
+    }
+
+    #result-label-1,
+    #result-label-2 {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      font-size: 15px;
+    }
+
+    #result-percentage-1,
+    #result-percentage-2 {
+      font-size: 15px;
+    }
+
+    @media (max-width: 400px) {
+      .result {
+        height: 25px;
+      }
+    }
+  </style>
+
+  <title>Recall Checker</title>
+</head>
+
+<body class="bg-transparent">
+  <main class="mx-auto card card-inference border-0 text-center">
+    <div class="card-header bg-gradient-blue justify-content-start py-4">
+      <h3 class="text-white text-start mb-0"><span class="ai-span">AI</span> recall checker</h3>
+    </div>
+
+    <div class="card-body">
+      <div class="justify-content-center contents">
+        <div class="canvas-container">
+          <div class="loading-comp align-items-center justify-content-center fs-5 fw-bold">
+            Loading...
+          </div>
+          <canvas class="rounded image-canvas"></canvas>
+          <label for="file-input"
+            class="file-input-label-container d-flex align-items-center justify-content-center fs-5 fw-bold">
+            click to upload image</label>
+          <input id="file-input" type="file" />
+        </div>
+      </div>
+
+      <div id="result-comp" class="ms-2">
+        <div class="row mx-0 w-100">
+          <div class="progress result col-9 px-0 border">
+            <label id="result-label-1"></label>
+            <div class="progress-bar result-bar text-dark" id="result-1" role="progressbar" style="width: 0%;"
+              aria-valuenow="0" aria-valuemin="0" aria-valuemax="1"></div>
+          </div>
+          <div class="col-3 d-flex align-items-center justify-content-center">
+            <span id="result-percentage-1" class="text-center">0%</span>
+          </div>
+        </div>
+        <!--
+
+            <div class="row mx-0 w-100">
+              <div class="progress result col-9 px-0 border">
+                <label id="result-label-2"></label>
+                <div
+                class="progress-bar result-bar text-dark"
+                id="result-2"
+                role="progressbar"
+                style="width: 0%;"
+                aria-valuenow="0"
+                aria-valuemin="0"
+                aria-valuemax="1"
+                ></div>
+              </div>
+              <div class="col-3 d-flex align-items-center justify-content-center">
+                <span id="result-percentage-2" class="text-center">0%</span>
+              </div>
+            </div>
+          -->
+      </div>
+    </div>
+  </main>
+
+  <footer></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.7.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
+    crossorigin="anonymous"></script>
+  <script>
+    const loadingProgress = (interval) => {
+      let timer;
+      const loadingSpan = document.createElement('span');
+      loadingSpan.innerText = '0%';
+      document.querySelector('.loading-comp').appendChild(loadingSpan);
+      let percentage = 0;
+
+      timer = setInterval(() => {
+        const proceed = Math.floor(Math.random() * 10);
+        loadingSpan.innerText = `${percentage + proceed < 99 ? (percentage += proceed) : percentage
+          }%`;
+      }, interval);
+
+      return {
+        end: () => {
+          clearInterval(timer);
+          loadingSpan.innerText = '100%';
+        },
+      };
+    };
+
+    window.onload = async () => {
+      const label = ["(주)RKM Tech 포스파민",
+        "(주)네이처생명과학 프리미엄 프로바이오틱스 레이디",
+        "(주)대창농산 김밥우엉",
+        "(주)두니아 냉동화살오징어",
+        "(주)바르미식품 강황가루",
+        "(주)바르미식품 계피가루(시나몬가루)",
+        "(주)성신푸드 왕로지",
+        "(주)승명 슈퍼옥타칸",
+        "(주)에스엠홀푸드 더 베스트 유산균",
+        "(주)에스엠홀푸드 트리플 피 프로바이오틱스",
+        "(주)에이치비플러스 냉동다진마늘",
+        "(주)엘카라 락토 프로바이오틱스",
+        "(주)엠에이치코리아 마하캔디",
+        "(주)이마트 얼그레이 홍차",
+        "(주)자이언트케미칼 석유왁스",
+        "(주)자이언트케미칼 솔검",
+        "(주)자이언트케미칼 시워드솔",
+        "(주)자이언트케미칼 자이언트왁스",
+        "(주)제이엔제이트레이드(J&J Trade Co. Ltd.) 코코엘 오가닉 엑스트라 버진 코코넛오일",
+        "(주)진성푸드 본래 찰순대",
+        "(주)채운베스텍 ICE CREAM MAKING MACHINE",
+        "(주)채운베스텍 제빙기(ICE MAKER  ICE CUBER)",
+        "(주)청은에프엔비 계피가루",
+        "(주)청은에프엔비 볶음콩가루",
+        "(주)탑헬스 비포락토 프로바이오타민",
+        "(주)파마택코리아 파마젠 유산균의 아침 더파이브V",
+        "(주)하이웰코리아 프리미엄 빌베리 아이케어",
+        "(주)한국씨엔에스팜 쇼킹 다이어트",
+        "(주)헬스메디 센트라징코 플러스",
+        "4월17일 시래기들깨국(냉동)",
+        "가온식품 짜",
+        "경주한우영농법인 풍월 곰탕",
+        "고도리 와이너리 고도리 스파클링 와인",
+        "굿데이 진안홍삼",
+        "극동에치팜(주) 카브씬-엘",
+        "금보종합식품 분말엿기름",
+        "금산인삼협동조합 리얼진홍삼액",
+        "금산홍삼 대현이네홍삼액",
+        "기린농협가공사업소 황옥수수가루",
+        "김포맥아식품 새싹보리분말",
+        "남미SNF(주) 훈제연어슬라이스",
+        "남영상사 코나로드더치커피(커피의눈물)",
+        "네오팜 에버봄 에스",
+        "넥스트바이오주식회사 폴바셋콜드브루아메리카노",
+        "농업회사법인 설성식품 주식회사 무항생제 한우다짐육 2단계",
+        "농업회사법인(주)제주향 제주한라봉아직도까서먹니",
+        "농업회사법인녹색식품주식회사 녹색사랑야채수",
+        "농업회사법인싱그람주식회사 반찬애양념깻잎",
+        "농업회사법인싱그람주식회사 반찬애연근조림",
+        "농업회사법인조인주식회사맹동지점 조인전란",
+        "농업회사법인주식회사코리아식품 퍼스트황닭",
+        "대경무역 냉동번데기",
+        "대주푸드 돈까스소스",
+        "더블에이치 노니열매환",
+        "더블에이치 엉겅퀴민들레환",
+        "동원디어푸드주식회사가산공장 비지찌개",
+        "멀티박코리아(주) PACKAGING FILM",
+        "멜라루카인터내셔날코리아주식회사 픽퍼포먼스팩50+",
+        "멜라루카인터내셔날코리아주식회사 픽퍼포먼스팩맨",
+        "멜라루카인터내셔날코리아주식회사 픽퍼포먼스팩우먼",
+        "목향허니비 사양벌꿀",
+        "몬쉘코리아경기센터 떠먹는치즈케이크",
+        "미래바이오 피비5000 파워골드 플러스",
+        "범아식품  순후추",
+        "보나테라주식회사 보나테라초콜릿",
+        "봉산냉동 봉산식용얼음",
+        "비타민뱅크주식회사 루테인알파",
+        "비타민뱅크주식회사 멀티비타민&미네랄올앤원50플러스",
+        "비타민뱅크주식회사 장용성신바이오틱스100",
+        "비헬스뉴트리션 로얄프로폴리스",
+        "삼보인터내셔날 맘톰",
+        "삼주티앤비주식회사 페퍼민트레몬티",
+        "상명농산 구운땅콩",
+        "서광농업협동조합 맑은햇살생강분말",
+        "선홍수산식품 감칠맛이가득맥반석오징어몸통구이",
+        "세종허브 보리새싹분말",
+        "세진상사 월계수잎",
+        "센트럴팜주식회사 유기농원료비타민C키즈유산균+비타민D",
+        "수빈유통 수빈 당귀백숙재료 티백",
+        "수빈유통 수빈 백숙재료 티백(국내산)",
+        "수빈유통 수빈 백숙재료 티백(깊은맛)",
+        "신나는식품 신나는떡갈비맛스테이크",
+        "신영측기(주) 제빙기(ICE MAKER MINI ICE MAKER)",
+        "심씨네젓갈식품 멸치액젓",
+        "아기뷰(I GIVE YOU) 프리미엄 골드 프로바이오틱스 17",
+        "아실리코리아유한회사 프로바이오100프로바이오틱스",
+        "알파인리서치(주) 프롬안스플럼",
+        "앤푸드 얼큰시래기소곱창전골",
+        "양촌식품 감식초",
+        "에스비트레이드 주식회사 냉동 무청",
+        "에스엘 일회용식품용기2",
+        "에스엘 일회용식품용기",
+        "에이케이무역주식회사 맘톰쉬림페이스트",
+        "엘엔비내츄럴 유토피스에프",
+        "영농조합법인 강화사자발약쑥 강화사자발쑥진액100",
+        "영농조합법인산골농장 도라지청",
+        "영농조합법인수승대발효마을 수승대발효마을유기농된장",
+        "영덕농수산영어농조합법인 씨트리성게알통조림",
+        "영흥식품주식회사 굴소스(굴추출물20%)",
+        "원보푸드 연변찹쌀순대",
+        "유한헬스팜 장스마일 생 유산균",
+        "육수온 한우사골곰탕",
+        "이알엠 주식회사 바이탈 킹크릴 1200",
+        "이제이푸드 쭈꾸미불고기",
+        "이지메디칼 크릴 파워",
+        "일품농산주식회사 목이버섯",
+        "정희화학(주) 탕국반찬용기(23193)미색",
+        "제이푸드월드주식회사 신선당근",
+        "제주농장영농조합법인제주지점 생알로에면역젤리",
+        "제주농장영농조합법인제주지점 요망진 ABC 주스",
+        "제주본초협동조합 어우야",
+        "주식회사 명성뉴트라 남극 파워 크릴",
+        "주식회사 명성뉴트라 바이탈 킹크릴 1200",
+        "주식회사 명성뉴트라 이지크릴오일",
+        "주식회사 비오에스케이스파 레몬오일",
+        "주식회사 비오에스케이스파 바질",
+        "주식회사 비오에스케이스파 스피아민트",
+        "주식회사 비오에스케이스파 아로마워터레몬",
+        "주식회사 비오에스케이스파 아로마워터바질",
+        "주식회사 비오에스케이스파 아로마워터스피아",
+        "주식회사 비오에스케이스파 아로마워터주니퍼",
+        "주식회사 비오에스케이스파 아로마워터프랑",
+        "주식회사 비오에스케이스파 주니퍼베리",
+        "주식회사 비오에스케이스파 프랑킨센스",
+        "주식회사 상촌식품 된장",
+        "주식회사 진성홀딩스 피비10 골드-500",
+        "주식회사 한미무역 사리왕기티",
+        "주식회사진성바이오 바질분말",
+        "주식회사그린팜푸드농업회사법인 미소예찬고인돌떡갈비",
+        "주식회사글로벌서비스 바바예브스키벨로츠카",
+        "주식회사글로브 G1콩기름",
+        "주식회사노바렉스 에버핏이너다이어트",
+        "주식회사다이트라 덕검-114",
+        "주식회사다이트라 덕검-555",
+        "주식회사도투락 더조은한끼곤약젤리복숭아",
+        "주식회사도투락 더조은한끼곤약젤리청포도",
+        "주식회사동원F&B 수라양반차돌된장찌개",
+        "주식회사동진제약 홍삼농축액",
+        "주식회사동트는세상인 레민다스파이랄산소수",
+        "주식회사뚜레반 계피가루",
+        "주식회사본데어리 건국구워먹는치즈",
+        "주식회사비락 동물복지우유",
+        "주식회사비락 올바른우유",
+        "주식회사비락 올바른우유클래식",
+        "주식회사비엘헬스케어 산골비타민젤리",
+        "주식회사비오티 멀티락신바이오틱",
+        "주식회사상촌식품 된장",
+        "주식회사성우농수산 호박씨",
+        "주식회사스위트드림 톡젤리청포도맛",
+        "주식회사신영에이치에스 평창한우마을정성드린한우사골곰탕",
+        "주식회사신영에프에스 페페로치노분쇄",
+        "주식회사신영허브 강황분말",
+        "주식회사아라움 쥐치포",
+        "주식회사에스앤피인터내셔널 블랙티",
+        "주식회사에스앤피인터내셔널 얼그레이",
+        "주식회사에스케이와이통상 프로바이오틱스 100억",
+        "주식회사엘카라 오메가3맥시1100",
+        "주식회사우리바다살림 반건조서대",
+        "주식회사육화원에프앤디 오븐통닭",
+        "주식회사율곡 기름과장재래식콩된장",
+        "주식회사이목원 박가부대떡갈비맛구이",
+        "주식회사이어수산 디포리멸치국물팩",
+        "주식회사인코트레이딩 꼬베뗌빼끄리욱",
+        "주식회사일신국제무역 얼그레이티",
+        "주식회사자연과사람들 더단백드링크초코",
+        "주식회사제이에스홀딩스팜 얼라이브신바이오틱스골드",
+        "주식회사진성바이오지점 오레가노(홀)",
+        "주식회사참존비엔에프 참존석류7",
+        "주식회사청은에프엔비 계피가루",
+        "주식회사코리아유통 쏸차이",
+        "주식회사코엔타이 라임쥬스맛음료",
+        "주식회사펄세스 리퀴드비타민C",
+        "주식회사프로게이너 브이쓰리",
+        "주식회사한미양행 삼성 눈헬스케어",
+        "주식회사한솔에프디 호박씨",
+        "주식회사한식품 개성참기름",
+        "주식회사한일팜스 치킨다리살스테이크",
+        "주식회사해가원푸드 햇살나래볶음콩가루",
+        "주식회사해단지 해단지비빔양념장",
+        "주식회사헬스하우스 프리미엄루테인20MG",
+        "지평농협가공공장 토움쌈장",
+        "진생영농조합법인 날콩가루",
+        "참맛종합식품 창란젓",
+        "참바다영어조합법인 401햄폭탄치즈부대찌개",
+        "청수생약 볶은맥문동분말",
+        "초야식품 참이맛볶음콩가루",
+        "초정한우 초정한우암소사골육수",
+        "케이씨무역 냉동번데기",
+        "크로비프 코코넛그릇",
+        "큰들농업회사법인주식회사 9월의오미자",
+        "태원통상 라즈베리트위스트앤드링크",
+        "태원통상 블랙베리&블루베리트위스트앤드링크",
+        "태원통상 오렌지트위스트앤드링크",
+        "통라이프(TongLife) 프로바이오틱스생유산균",
+        "티케이 발효피쉬소스",
+        "푸른산참농원 진짜로달콤한사과즙",
+        "퓨어영(Pure young) 여주가루",
+        "학교법인건국대학교건국유업건국햄 장앤미아사이베리",
+        "한국바이오젠(주)  글리신",
+        "한국바이오젠(주) 타우린",
+        "한국바이오팜(주) 웰러스다이어트CLA",
+        "한국씨엔에스팜 밸런스다이어트",
+        "한국피엘에이(주) 돈가스용기",
+        "한양KF 의정부 한양부대찌개",
+        "한양전통식품 식혜",
+        "할랄푸드스 쇠고기스튜",
+        "해청식품주식회사 쥐치포",
+        "효성인터내셔널주식회사 델리썬소프트플라워또띠아"];
+      const sortAndSliceData = (datas) => {
+        return datas
+          .map((confidence, index) => ({ label: label[index], confidence }))
+          .sort(
+            ({ confidence: confidence1 }, { confidence: confidence2 }) =>
+              confidence2 - confidence1
+          )
+          .slice(0, 2);
+      };
+
+      const getPercentage = (data) => {
+        return ((data || 0) * 100).toFixed(1);
+      };
+
+      const canvas = document.querySelector('.image-canvas');
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+      const fileInput = document.querySelector('input');
+      const fileLabel = document.querySelector('.file-input-label-container');
+      const resultComps = [
+        document.getElementById('result-1'),
+      ];
+      const resultLabels = [
+        document.getElementById('result-label-1'),
+      ];
+      const resultPercentages = [
+        document.getElementById('result-percentage-1'),
+      ];
+
+      fileInput.addEventListener('change', ({ target: { files } }) => {
+        if (files.length > 0) {
+          const reader = new FileReader();
+
+          reader.onload = ({ target: { result } }) => {
+            const image = document.createElement('img');
+
+            image.onload = () => {
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+              fileLabel.classList.add('image-uploaded');
+              classify();
+            };
+
+            image.src = result;
+          };
+
+          reader.readAsDataURL(files[0]);
+        }
+      });
+
+      async function setup() {
+        window.classifier = await tf.loadGraphModel('./model.json');
+      }
+
+      async function classify() {
+        const imageTensor = tf.image.cropAndResize(
+          tf.stack([tf.browser.fromPixels(canvas)]),
+          [[0, 0, 1, 1]],
+          [0],
+          [224, 224]
+        );
+
+        const results = sortAndSliceData(window.classifier.predict(imageTensor).arraySync()[0]);
+
+        resultComps.map((comp, index) => {
+          const { label, confidence } = results[index];
+          comp.style.width = `${getPercentage(confidence)}%`;
+          if(getPercentage(confidence) >= 50){resultLabels[index].innerHTML = `${label}`}else
+          {resultLabels[index].innerHTML = "리콜 대상이 아닙니다"};
+          resultPercentages[index].innerHTML = `${getPercentage(confidence)}%`;
+        });
+      }           
+
+
+      try {
+        const loading = loadingProgress(500);
+        await setup();
+        document.querySelector('.loading-comp').setAttribute('data-loaded', true);
+        loading.end();
+      } catch (err) {
+        console.error(err);
+        alert(err);
+      }
+    };
+  </script>
+</body>
+
+</html>
